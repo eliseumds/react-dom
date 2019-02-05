@@ -3,17 +3,13 @@
   "version": "16.7.0",
   "description": "React package for working with the DOM.",
   "main": "index.js",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/eliseumds/react.git",
-    "directory": "packages/react-dom"
-  },
+  "repository": "facebook/react",
   "keywords": [
     "react"
   ],
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/eliseumds/react/issues"
+    "url": "https://github.com/facebook/react/issues"
   },
   "homepage": "https://reactjs.org/",
   "dependencies": {

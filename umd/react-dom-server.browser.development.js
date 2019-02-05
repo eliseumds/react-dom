@@ -312,6 +312,7 @@ var describeComponentFrame = function (name, source, ownerName) {
   return '\n    in ' + (name || 'Unknown') + sourceInfo;
 };
 
+var enableHooks = true;
 // Helps identify side effects in begin-phase lifecycle hooks and setState reducers:
 
 
@@ -1006,6 +1007,21 @@ function is(x, y) {
   ;
 }
 
+function areHookInputsEqual(arr1, arr2) {
+  // Don't bother comparing lengths in prod because these arrays should be
+  // passed inline.
+  {
+    !(arr1.length === arr2.length) ? warning$1(false, 'Detected a variable number of hook dependencies. The length of the ' + 'dependencies array should be constant between renders.\n\n' + 'Previous: %s\n' + 'Incoming: %s', arr1.join(', '), arr2.join(', ')) : void 0;
+  }
+  for (var i = 0; i < arr1.length; i++) {
+    if (is(arr1[i], arr2[i])) {
+      continue;
+    }
+    return false;
+  }
+  return true;
+}
+
 var currentlyRenderingComponent = null;
 var firstWorkInProgressHook = null;
 var workInProgressHook = null;
@@ -1019,41 +1035,9 @@ var renderPhaseUpdates = null;
 var numberOfReRenders = 0;
 var RE_RENDER_LIMIT = 25;
 
-var isInHookUserCodeInDev = false;
-
-// In DEV, this is the name of the currently executing primitive hook
-var currentHookNameInDev = void 0;
-
 function resolveCurrentlyRenderingComponent() {
   !(currentlyRenderingComponent !== null) ? invariant(false, 'Hooks can only be called inside the body of a function component.') : void 0;
-  {
-    !!isInHookUserCodeInDev ? warning$1(false, 'Hooks can only be called inside the body of a function component. ' + 'Do not call Hooks inside other Hooks. For more information, see ' + 'https://fb.me/rules-of-hooks') : void 0;
-  }
   return currentlyRenderingComponent;
-}
-
-function areHookInputsEqual(nextDeps, prevDeps) {
-  if (prevDeps === null) {
-    {
-      warning$1(false, '%s received a final argument during this render, but not during ' + 'the previous render. Even though the final argument is optional, ' + 'its type cannot change between renders.', currentHookNameInDev);
-    }
-    return false;
-  }
-
-  {
-    // Don't bother comparing lengths in prod because these arrays should be
-    // passed inline.
-    if (nextDeps.length !== prevDeps.length) {
-      warning$1(false, 'The final argument passed to %s changed size between renders. The ' + 'order and size of this array must remain constant.\n\n' + 'Previous: %s\n' + 'Incoming: %s', currentHookNameInDev, '[' + nextDeps.join(', ') + ']', '[' + prevDeps.join(', ') + ']');
-    }
-  }
-  for (var i = 0; i < prevDeps.length && i < nextDeps.length; i++) {
-    if (is(nextDeps[i], prevDeps[i])) {
-      continue;
-    }
-    return false;
-  }
-  return true;
 }
 
 function createHook() {
@@ -1091,9 +1075,6 @@ function createWorkInProgressHook() {
 
 function prepareToUseHooks(componentIdentity) {
   currentlyRenderingComponent = componentIdentity;
-  {
-    isInHookUserCodeInDev = false;
-  }
 
   // The following should have already been reset
   // didScheduleRenderPhaseUpdate = false;
@@ -1125,9 +1106,6 @@ function finishHooks(Component, props, children, refOrContext) {
   numberOfReRenders = 0;
   renderPhaseUpdates = null;
   workInProgressHook = null;
-  {
-    isInHookUserCodeInDev = false;
-  }
 
   // These were reset above
   // currentlyRenderingComponent = null;
@@ -1143,16 +1121,10 @@ function finishHooks(Component, props, children, refOrContext) {
 function readContext(context, observedBits) {
   var threadID = currentThreadID;
   validateContextBounds(context, threadID);
-  {
-    !!isInHookUserCodeInDev ? warning$1(false, 'Context can only be read while React is rendering. ' + 'In classes, you can read it in the render method or getDerivedStateFromProps. ' + 'In function components, you can read it directly in the function body, but not ' + 'inside Hooks like useReducer() or useMemo().') : void 0;
-  }
   return context[threadID];
 }
 
 function useContext(context, observedBits) {
-  {
-    currentHookNameInDev = 'useContext';
-  }
   resolveCurrentlyRenderingComponent();
   var threadID = currentThreadID;
   validateContextBounds(context, threadID);
@@ -1164,20 +1136,12 @@ function basicStateReducer(state, action) {
 }
 
 function useState(initialState) {
-  {
-    currentHookNameInDev = 'useState';
-  }
   return useReducer(basicStateReducer,
   // useReducer has a special case to support lazy useState initializers
   initialState);
 }
 
 function useReducer(reducer, initialState, initialAction) {
-  {
-    if (reducer !== basicStateReducer) {
-      currentHookNameInDev = 'useReducer';
-    }
-  }
   currentlyRenderingComponent = resolveCurrentlyRenderingComponent();
   workInProgressHook = createWorkInProgressHook();
   if (isReRender) {
@@ -1196,13 +1160,7 @@ function useReducer(reducer, initialState, initialAction) {
           // priority because it will always be the same as the current
           // render's.
           var _action = update.action;
-          {
-            isInHookUserCodeInDev = true;
-          }
           newState = reducer(newState, _action);
-          {
-            isInHookUserCodeInDev = false;
-          }
           update = update.next;
         } while (update !== null);
 
@@ -1213,9 +1171,6 @@ function useReducer(reducer, initialState, initialAction) {
     }
     return [workInProgressHook.memoizedState, _dispatch];
   } else {
-    {
-      isInHookUserCodeInDev = true;
-    }
     if (reducer === basicStateReducer) {
       // Special case for `useState`.
       if (typeof initialState === 'function') {
@@ -1223,9 +1178,6 @@ function useReducer(reducer, initialState, initialAction) {
       }
     } else if (initialAction !== undefined && initialAction !== null) {
       initialState = reducer(initialState, initialAction);
-    }
-    {
-      isInHookUserCodeInDev = false;
     }
     workInProgressHook.memoizedState = initialState;
     var _queue2 = workInProgressHook.queue = {
@@ -1237,32 +1189,22 @@ function useReducer(reducer, initialState, initialAction) {
   }
 }
 
-function useMemo(nextCreate, deps) {
+function useMemo(nextCreate, inputs) {
   currentlyRenderingComponent = resolveCurrentlyRenderingComponent();
   workInProgressHook = createWorkInProgressHook();
 
-  var nextDeps = deps === undefined ? null : deps;
+  var nextInputs = inputs !== undefined && inputs !== null ? inputs : [nextCreate];
 
-  if (workInProgressHook !== null) {
+  if (workInProgressHook !== null && workInProgressHook.memoizedState !== null) {
     var prevState = workInProgressHook.memoizedState;
-    if (prevState !== null) {
-      if (nextDeps !== null) {
-        var prevDeps = prevState[1];
-        if (areHookInputsEqual(nextDeps, prevDeps)) {
-          return prevState[0];
-        }
-      }
+    var prevInputs = prevState[1];
+    if (areHookInputsEqual(nextInputs, prevInputs)) {
+      return prevState[0];
     }
   }
 
-  {
-    isInHookUserCodeInDev = true;
-  }
   var nextValue = nextCreate();
-  {
-    isInHookUserCodeInDev = false;
-  }
-  workInProgressHook.memoizedState = [nextValue, nextDeps];
+  workInProgressHook.memoizedState = [nextValue, nextInputs];
   return nextValue;
 }
 
@@ -1282,10 +1224,7 @@ function useRef(initialValue) {
   }
 }
 
-function useLayoutEffect(create, deps) {
-  {
-    currentHookNameInDev = 'useLayoutEffect';
-  }
+function useLayoutEffect(create, inputs) {
   warning$1(false, 'useLayoutEffect does nothing on the server, because its effect cannot ' + "be encoded into the server renderer's output format. This will lead " + 'to a mismatch between the initial, non-hydrated UI and the intended ' + 'UI. To avoid this, useLayoutEffect should only be used in ' + 'components that render exclusively on the client.');
 }
 
@@ -1322,12 +1261,10 @@ function dispatchAction(componentIdentity, queue, action) {
   }
 }
 
-function useCallback(callback, deps) {
-  // Callbacks are passed as they are in the server environment.
-  return callback;
-}
-
 function noop() {}
+function identity(fn) {
+  return fn;
+}
 
 var currentThreadID = 0;
 
@@ -1343,13 +1280,17 @@ var Dispatcher = {
   useRef: useRef,
   useState: useState,
   useLayoutEffect: useLayoutEffect,
-  useCallback: useCallback,
+  // Callbacks are passed as they are in the server environment.
+  useCallback: identity,
   // useImperativeHandle is not run in the server environment
   useImperativeHandle: noop,
   // Effects are not run in the server environment.
   useEffect: noop,
   // Debugging effect
   useDebugValue: noop
+};
+var DispatcherWithoutHooks = {
+  readContext: readContext
 };
 
 var HTML_NAMESPACE = 'http://www.w3.org/1999/xhtml';
@@ -3176,7 +3117,11 @@ var ReactDOMServerRenderer = function () {
     var prevThreadID = currentThreadID;
     setCurrentThreadID(this.threadID);
     var prevDispatcher = ReactCurrentDispatcher.current;
-    ReactCurrentDispatcher.current = Dispatcher;
+    if (enableHooks) {
+      ReactCurrentDispatcher.current = Dispatcher;
+    } else {
+      ReactCurrentDispatcher.current = DispatcherWithoutHooks;
+    }
     try {
       // Markup generated within <Suspense> ends up buffered until we know
       // nothing in that boundary suspended
